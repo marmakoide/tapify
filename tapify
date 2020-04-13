@@ -1,0 +1,53 @@
+#! /usr/bin/env python
+
+import os
+import sys
+import argparse
+
+
+
+def main():
+	# Command line parsing
+	parser = argparse.ArgumentParser(description = 'Generate an Oric tape file from a raw binary file')
+	parser.add_argument('-a', '--autorun', action = 'store_true', help = 'Launch after loading completion')
+	parser.add_argument('-s', '--start-address', type = int, default = 0x500, help = 'Start address')
+	parser.add_argument('-n', '--name', type = str, default = "", help = 'File name in the tape')
+	parser.add_argument('input_path', help = 'input path')
+	parser.add_argument('output_path', help = 'output path')
+
+	args = parser.parse_args()
+
+	# Check input validity
+	if args.start_address < 0 or args.start_address >= 2 ** 16:
+		sys.stderr.write('Invalid start address')
+		os.exit(0)
+
+	if len(args.name) > 16:
+		sys.stderr.write('Tape file name longer than 16 ASCII characters')
+		os.exit(0)
+
+	# Read the input in one single gob
+	with open(args.input_path, 'rb') as in_file:
+		in_data = in_file.read()	
+	
+	# Generate the header
+	name_data = [ord(c) for c in args.name]
+	start_address = args.start_address
+	end_address = start_address + len(in_data) - 1
+
+	# Generate the output
+	header_data = [0x16, 0x16, 0x16, 0x24, 0x00, 0x00, 0x80]
+	header_data.append(0xc7 if args.autorun else 0x00)
+	header_data.extend([end_address >> 8, end_address & 0xff])
+	header_data.extend([start_address >> 8, start_address & 0xff])
+	header_data.extend([0x00] + name_data + [0x00])
+
+	with open(args.output_path, 'wb') as out_file:
+		out_file.write(bytearray(header_data))	
+		out_file.write(in_data)	
+
+
+
+if __name__ == '__main__':
+	main()
+
